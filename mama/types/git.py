@@ -5,6 +5,7 @@ import os, shutil, stat, string
 from .dep_source import DepSource
 from ..utils.system import Color, System, console, error
 from ..utils.sub_process import SubProcess, execute, execute_piped, execute_piped_echo
+from ..utils.github_tarball import parse_github_url, download_and_extract_tarball
 from ..util import is_dir_empty, save_file_if_contents_changed, read_lines_from, path_join
 
 
@@ -288,10 +289,27 @@ class Git(DepSource):
                 raise RuntimeError(f'Target {self.name} clone failed: {cmd}')
 
 
+    def _try_tarball_clone(self, dep: BuildDependency) -> bool:
+        # Other git forges have similar features but only github supported for now.
+        if not parse_github_url(self.url):
+            if dep.config.verbose:
+                console(f'    {self.name}  not a GitHub URL, skipping tarball', color=Color.YELLOW)
+            return False
+
+        if download_and_extract_tarball(dep, self):
+            return True
+
+        if dep.config.print:
+            console(f'  - Target {dep.name: <16} TARBALL failed, falling back to git clone', color=Color.YELLOW)
+        return False
+
+
     def clone_or_pull(self, dep: BuildDependency, wiped=False):
         # by default we create a shallow clone, unless unshallow is specified in config or this dep
         unshallow = dep.config.unshallow or (not self.shallow)
         if is_dir_empty(dep.src_dir):
+            if dep.config.tarball and self._try_tarball_clone(dep):
+                return
             if not wiped and dep.config.print:
                 console(f"  - Target {dep.name: <16} CLONE because src is missing", color=Color.BLUE)
             br_or_tag = self.branch_or_tag()
@@ -347,6 +365,28 @@ class Git(DepSource):
         """
         if not dep.source_dir_exists():  # we MUST pull here
             self.clone_or_pull(dep)
+            return True
+
+        has_git_dir = os.path.exists(f'{dep.src_dir}/.git')
+
+        if not has_git_dir:
+            if dep.config.tarball:
+                if dep.config.verbose:
+                    console(f'    {self.name} tarball sources exist, skipping git operations', color=Color.YELLOW)
+                return False
+            # source was previously a tarball download or an invalid state, wipe and reclone with git
+            if dep.config.verbose:
+                console(f'    {self.name} no .git directory, invalid state for git actions, recloning', color=Color.YELLOW)
+            self.reclone_wipe(dep)
+            self.clone_or_pull(dep, wiped=True)
+            return True
+
+        if has_git_dir and dep.config.tarball:
+            # source was previously a git clone, wipe and re-download as tarball
+            if dep.config.verbose:
+                console(f'    {self.name} .git directory exists but tarball mode enabled, switching to tarball', color=Color.YELLOW)
+            self.reclone_wipe(dep)
+            self.clone_or_pull(dep, wiped=True)
             return True
 
         is_target = dep.is_current_target()

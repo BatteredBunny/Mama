@@ -178,6 +178,20 @@ class BuildTarget:
         self.config.set_artifactory_ftp(ftp_url=ftp_url, auth=auth)
 
 
+    def enable_tarball(self):
+        """
+        Enables tarball mode: downloads tarballs instead of git cloning.
+        This is significantly faster for usage that does not need the git part at all.
+        Only works for github repositories as of now. non-github deps fall back to git clone.
+
+        ```
+            def settings(self):
+                self.enable_tarball()
+        ```
+        """
+        self.config.tarball = True
+
+
     def add_local(self, name, source_dir, mamafile=None, always_build=False, args=[]) -> BuildDependency:
         """
         Add a local dependency. This can be a git submodule or just some local folder.

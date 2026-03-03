@@ -38,6 +38,7 @@ class BuildConfig:
         self.reclone   = False
         self.dirty     = False # marks a target for rebuild on next build even if it's up to date
         self.unshallow = False  # by default, git clones are shallow, this allows unshallowing
+        self.tarball    = False  # if True, use tarball downloads instead of git clone, currently only github supported
         self.mama_init = False
         self.print     = True
         self.verbose   = False
@@ -563,7 +564,7 @@ class BuildConfig:
         elif self.imx8mp:
             self.cc_path  = f'{self.imx8mp.bin()}aarch64-poky-linux-gcc'
             self.cxx_path = f'{self.imx8mp.bin()}aarch64-poky-linux-g++'
-            self.cxx_version = self.get_gcc_clang_fullversion(self.cc_path, dumpfullversion=True)            
+            self.cxx_version = self.get_gcc_clang_fullversion(self.cc_path, dumpfullversion=True)
         elif self.mips:
             self.cc_path  = f'{self.mips.compiler_prefix()}gcc'
             self.cxx_path = f'{self.mips.compiler_prefix()}g++'
